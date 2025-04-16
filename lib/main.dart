@@ -7,7 +7,7 @@ import 'auth_gate.dart'; // Import the AuthGate widget
 // --- Firebase Initialization ---
 // Ensure you have run `flutterfire configure` and have firebase_options.dart
 Future<void> main() async {
-  // Ensure Flutter bindings are initialized
+  // Ensure Flutter bindings are initialized (Descricao  test git)
   WidgetsFlutterBinding.ensureInitialized();
   // Initialize Firebase
   // Use DefaultFirebaseOptions.currentPlatform for platform-specific config
