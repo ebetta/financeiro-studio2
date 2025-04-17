@@ -31,7 +31,13 @@ class AuthGate extends StatelessWidget {
         }
         // If user is not logged in, show Login Screen
         else {
-          return LoginScreen(authService: authService); // Pass authService
+          return Scaffold(
+            body: Navigator(
+              onGenerateRoute: (settings) {
+                return MaterialPageRoute(builder: (context) => LoginScreen(authService: authService));
+              },
+            ),
+          );
         }
       },
     );

@@ -205,6 +205,40 @@ class AuthService {
     }
   }
 
-  // --- TODO: Implement Sign Up if needed ---
-  // Future<UserCredential?> signUpWithEmailAndPassword(String email, String password, BuildContext context) async { ... }
+  // --- Sign Up with Email and Password ---
+  Future<void> signUp(String name, String email, String password) async {
+    try {
+      // Create user with email and password
+      UserCredential userCredential =
+          await _firebaseAuth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      // Update the user's display name
+      if (userCredential.user != null) {
+        await userCredential.user!.updateDisplayName(name);
+        // You might need to reload the user for the display name to update immediately
+        await userCredential.user!.reload();
+      } else {
+        throw Exception("Falha ao criar usuário.");
+      }
+    } on FirebaseAuthException catch (e) {
+      String errorMessage;
+      switch (e.code) {
+        case 'email-already-in-use':
+          errorMessage = 'Email já está em uso.';
+          break;
+        case 'invalid-email':
+          errorMessage = 'Formato de email inválido.';
+          break;
+        case 'weak-password':
+          errorMessage = 'Senha muito fraca.';
+          break;
+        default:
+          errorMessage = 'Erro ao cadastrar: ${e.message}';
+      }
+      throw Exception(errorMessage); // Throw with user-friendly message
+    }
+  }
 }

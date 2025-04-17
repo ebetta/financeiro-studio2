@@ -1,91 +1,23 @@
-// login_screen.dart
 import 'package:flutter/material.dart';
-import 'auth_service.dart'; // Import Auth Service
+import 'auth_service.dart';
+import 'sign_up_screen.dart';
 
-// --- Login Screen Widget ---
 class LoginScreen extends StatefulWidget {
-  final AuthService authService; // Receive AuthService instance
+  final AuthService authService;
 
-  const LoginScreen({super.key, required this.authService});
+  const LoginScreen({required this.authService, super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  LoginScreenState createState() => LoginScreenState(); // Made state public
 }
 
-class _LoginScreenState extends State<LoginScreen> {
-  // Controllers for email and password text fields
+// Made state public
+class LoginScreenState extends State<LoginScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  // State variable for loading indicator
   bool _isLoading = false;
-  // State variable for password visibility
-  bool _isPasswordVisible = false;
+  bool _obscureText = true; // To toggle password visibility
 
-  // --- Handle Email/Password Login ---
-  Future<void> _signInWithEmail() async {
-    // Prevent multiple clicks while loading
-    if (_isLoading) return;
-    setState(() => _isLoading = true); // Show loading indicator
-
-    // Get email and password from controllers
-    final email = _emailController.text.trim();
-    final password = _passwordController.text.trim();
-
-    // Validate inputs (basic)
-    if (email.isEmpty || password.isEmpty) {
-       // Check context before showing SnackBar (although less likely needed here)
-       if (mounted) {
-         ScaffoldMessenger.of(context).showSnackBar(
-           const SnackBar(content: Text('Por favor, preencha email e senha.'), backgroundColor: Colors.orangeAccent),
-         );
-       }
-       setState(() => _isLoading = false); // Hide loading
-       return;
-    }
-
-    // Call the sign-in method from AuthService
-    // Pass the current context
-    await widget.authService.signInWithEmailAndPassword(email, password, context);
-
-    // Hide loading indicator (AuthGate will handle navigation if successful)
-    // Check if the widget is still mounted before calling setState
-    if (mounted) {
-       setState(() => _isLoading = false);
-    }
-  }
-
-  // --- Handle Google Sign-In ---
-  Future<void> _signInWithGoogle() async {
-     if (_isLoading) return;
-     setState(() => _isLoading = true); // Show loading indicator
-
-     // Call the Google sign-in method, passing context
-     await widget.authService.signInWithGoogle(context);
-
-     // Hide loading indicator (AuthGate will handle navigation if successful)
-     if (mounted) {
-        setState(() => _isLoading = false);
-     }
-  }
-
-   // --- Handle Forgot Password ---
-  void _forgotPassword() {
-    final email = _emailController.text.trim();
-    if (email.isEmpty) {
-      // Check context before showing SnackBar
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Por favor, digite seu email para redefinir a senha.'), backgroundColor: Colors.orangeAccent),
-        );
-      }
-      return;
-    }
-    // Pass context to the method
-    widget.authService.sendPasswordResetEmail(email, context);
-  }
-
-
-  // Dispose controllers when the widget is removed
   @override
   void dispose() {
     _emailController.dispose();
@@ -93,137 +25,270 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  Future<void> _signIn() async {
+    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Por favor, preencha o email e a senha.')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      // Pass context to the signIn method
+      await widget.authService.signInWithEmailAndPassword(
+        _emailController.text.trim(),
+        _passwordController.text.trim(),
+        context,
+      );
+      // Navigation to HomeScreen is handled by AuthGate
+      // No need for SnackBar here as AuthService handles it
+    } catch (e) {
+      // Error handling is now within AuthService, but we catch any potential rethrow
+      if (mounted) {
+        // Optionally show a generic error if AuthService doesn't handle all cases
+        // ScaffoldMessenger.of(context).showSnackBar(
+        //   SnackBar(
+        //     content: Text('Erro ao fazer login: ${e.toString()}'),
+        //     backgroundColor: Colors.red,
+        //   ),
+        // );
+      }
+    } finally {
+       if (mounted) {
+         setState(() {
+           _isLoading = false;
+         });
+      }
+    }
+  }
+
+  Future<void> _signInWithGoogle() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      // Pass context to the signInWithGoogle method
+      await widget.authService.signInWithGoogle(context);
+      // Navigation to HomeScreen is handled by AuthGate
+      // No need for SnackBar here as AuthService handles it
+    } catch (e) {
+      // Error handling is now within AuthService
+       if (mounted) {
+        // Optionally show a generic error if AuthService doesn't handle all cases
+        // ScaffoldMessenger.of(context).showSnackBar(
+        //   SnackBar(
+        //     content: Text('Erro ao fazer login com Google: ${e.toString()}'),
+        //     backgroundColor: Colors.red,
+        //   ),
+        // );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  void _forgotPassword() {
+    // Show dialog to get email for password reset
+    final TextEditingController resetEmailController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Recuperar Senha'),
+          content: TextField(
+            controller: resetEmailController,
+            keyboardType: TextInputType.emailAddress,
+            decoration: const InputDecoration(
+              labelText: 'Email',
+              hintText: 'Digite o email cadastrado',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () async {
+                final email = resetEmailController.text.trim();
+                if (email.isNotEmpty) {
+                  Navigator.pop(context); // Close the dialog
+                  await widget.authService.sendPasswordResetEmail(email, context);
+                } else {
+                  // Show error within the dialog if needed
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Por favor, insira um email.')),
+                  );
+                }
+              },
+              child: const Text('Enviar'),
+            ),
+          ],
+        );
+      },
+    ).whenComplete(() => resetEmailController.dispose()); // Dispose controller
+
+  }
+
+
+  void _navigateToSignUp() {
+    Navigator.push(
+      context,
+      // Pass the authService instance to SignUpScreen
+      MaterialPageRoute(builder: (context) => const SignUpScreen()), // Corrected: SignUpScreen constructor takes no arguments
+    );
+  }
+
+
   @override
   Widget build(BuildContext context) {
-    // Removed unused screenSize variable
-
     return Scaffold(
-      // Prevent overflow when keyboard appears
-      resizeToAvoidBottomInset: true,
       body: Center(
-        // Use SingleChildScrollView to allow scrolling on smaller screens
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
+          padding: const EdgeInsets.all(32.0),
           child: ConstrainedBox(
-             constraints: const BoxConstraints(maxWidth: 400), // Max width for web/tablet
+             constraints: const BoxConstraints(maxWidth: 400), // Max width for content
              child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.stretch, // Make buttons stretch
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
-                // --- App Logo/Title ---
-                // TODO: Replace with your actual logo or styled title (e.g., Image.asset('assets/your_logo.png'))
-                Icon(Icons.lock_outline, size: 60, color: Theme.of(context).primaryColor),
-                const SizedBox(height: 20),
+                // Replace with your actual logo or styled title
+                const Icon(
+                  Icons.app_registration, // Temporary logo
+                  size: 80,
+                  // color: Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(height: 16),
+
+                // Title
                 Text(
-                  'Bem-vindo!',
+                  'Bem-vindo de volta!',
                   textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                 ),
                 const SizedBox(height: 8),
-                 Text(
+
+                // Subtitle
+                Text(
                   'Faça login para continuar',
                   textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodyMedium,
+                  style: Theme.of(context).textTheme.titleMedium,
                 ),
-                const SizedBox(height: 40),
+                const SizedBox(height: 32),
 
-                // --- Email Field ---
+                // Email Field
                 TextField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
                   decoration: const InputDecoration(
                     labelText: 'Email',
-                    prefixIcon: Icon(Icons.email_outlined), // Simple icon
+                    prefixIcon: Icon(Icons.email),
+                    border: OutlineInputBorder(),
                   ),
-                  enabled: !_isLoading, // Disable when loading
+                  enabled: !_isLoading,
                 ),
                 const SizedBox(height: 16),
 
-                // --- Password Field ---
+                // Password Field
                 TextField(
                   controller: _passwordController,
-                  obscureText: !_isPasswordVisible, // Hide/show password
+                  obscureText: _obscureText,
                   decoration: InputDecoration(
                     labelText: 'Senha',
-                    prefixIcon: const Icon(Icons.lock_outline), // Simple icon
+                    prefixIcon: const Icon(Icons.lock),
+                    border: const OutlineInputBorder(),
                     suffixIcon: IconButton(
                       icon: Icon(
-                        _isPasswordVisible ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                        _obscureText ? Icons.visibility_off : Icons.visibility,
                       ),
                       onPressed: () {
                         setState(() {
-                          _isPasswordVisible = !_isPasswordVisible;
+                          _obscureText = !_obscureText;
                         });
                       },
                     ),
                   ),
-                   enabled: !_isLoading, // Disable when loading
+                  enabled: !_isLoading,
+                  onSubmitted: (_) => _signIn(), // Allow sign in on enter press
                 ),
                 const SizedBox(height: 8),
 
-                // --- Forgot Password Button ---
-                 Align(
+                // Forgot Password
+                Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
-                    onPressed: _isLoading ? null : _forgotPassword, // Disable when loading
+                    onPressed: _isLoading ? null : _forgotPassword,
                     child: const Text('Esqueceu a senha?'),
                   ),
                 ),
                 const SizedBox(height: 24),
 
-                // --- Login Button ---
+                // Sign In Button
                 _isLoading
-                    ? const Center(child: CircularProgressIndicator()) // Show loading indicator
+                    ? const Center(child: CircularProgressIndicator())
                     : ElevatedButton(
-                        onPressed: _signInWithEmail,
-                        child: const Text('ENTRAR'),
+                        onPressed: _signIn,
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          // Consider using theme color: Theme.of(context).colorScheme.primary
+                        ),
+                        child: const Text('Entrar'),
                       ),
                 const SizedBox(height: 16),
 
-                 // --- OR Separator ---
+                // OR Separator
                  Row(
-                   children: <Widget>[
-                     const Expanded(child: Divider()),
+                  children: <Widget>[
+                    const Expanded(child: Divider()),
                      Padding(
-                       padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                       child: Text('OU', style: Theme.of(context).textTheme.bodySmall),
-                     ),
-                     const Expanded(child: Divider()),
-                   ],
-                 ),
-                 const SizedBox(height: 16),
-
-                // --- Google Sign-In Button ---
-                ElevatedButton.icon(
-                  // Ensure you have 'assets/google_logo.png' in your project
-                  // and declared in pubspec.yaml
-                  icon: Image.asset(
-                    'assets/google_logo.png',
-                    height: 20.0,
-                    // Provide a fallback in case the image fails to load
-                    errorBuilder: (context, error, stackTrace) => const Icon(Icons.g_mobiledata, size: 24),
-                  ),
-                  label: const Text('Entrar com Google'),
-                  onPressed: _isLoading ? null : _signInWithGoogle, // Disable when loading
-                  style: ElevatedButton.styleFrom(
-                    foregroundColor: Colors.black87, backgroundColor: Colors.white, // Google button style
-                    side: BorderSide(color: Colors.grey.shade300), // Light border
-                  ),
+                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                      child: Text('OU', style: Theme.of(context).textTheme.bodySmall),
+                    ),
+                    const Expanded(child: Divider()),
+                  ],
                 ),
+                const SizedBox(height: 16),
 
-                // --- TODO: Add Sign Up Button/Link if needed ---
-                // Padding(
-                //   padding: const EdgeInsets.only(top: 20.0),
-                //   child: TextButton(
-                //     onPressed: () { /* TODO: Navigate to Sign Up Screen */ },
-                //     child: const Text('Não tem uma conta? Cadastre-se'),
-                //   ),
-                // ),
-              ],
+
+                // Google Sign In Button
+                ElevatedButton.icon(
+                      icon: Image.asset(
+                           'assets/google_logo.png', // Ensure you have this asset
+                            height: 20.0, // Adjust size as needed
+                             width: 20.0,
+                         ),
+                      label: const Text('Entrar com Google'),
+                      onPressed: _isLoading ? null : _signInWithGoogle, // Disable when loading
+                      style: ElevatedButton.styleFrom(
+                        foregroundColor: Colors.black87, backgroundColor: Colors.white, // Google button style
+                        side: BorderSide(color: Colors.grey.shade300), // Light border
+                      ),
+                    ),
+
+
+                    Padding(
+                      padding: const EdgeInsets.only(top: 20.0),
+                      child: TextButton(
+                        onPressed: _navigateToSignUp, // Use the dedicated function
+                        child: const Text('Não tem uma conta? Cadastre-se'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
+        );
+      }
+    }
